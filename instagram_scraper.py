@@ -34,7 +34,7 @@ class InstagramScraper:
             spreadsheet = self.gs.create(sheet_name)
             
             # Share with your email (replace with your email)
-            spreadsheet.share('your-email@gmail.com', perm_type='user', role='writer')
+            spreadsheet.share('instagramscraper@maps-437318.iam.gserviceaccount.com', perm_type='user', role='writer')
             
             # Get the first sheet
             worksheet = spreadsheet.get_worksheet(0)
