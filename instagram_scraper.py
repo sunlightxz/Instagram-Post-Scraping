@@ -27,17 +27,16 @@ class InstagramScraper:
 
     def save_to_sheets(self, results, sheet_name=None):
         try:
+            # Open existing spreadsheet by its ID
+            SPREADSHEET_ID = '1yxVXUAneiISJmO5I1ow574cJYxBOo5VVYg-WHApTDOY'  # Replace with your spreadsheet ID
+            spreadsheet = self.gs.open_by_key(SPREADSHEET_ID)
+            
+            # Create new worksheet with timestamp if no name provided
             if sheet_name is None:
-                sheet_name = f"Instagram_Scrape_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                sheet_name = f"Scrape_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
-            # Create new spreadsheet
-            spreadsheet = self.gs.create(sheet_name)
-            
-            # Share with your email (replace with your email)
-            spreadsheet.share('instagramscraper@maps-437318.iam.gserviceaccount.com', perm_type='user', role='writer')
-            
-            # Get the first sheet
-            worksheet = spreadsheet.get_worksheet(0)
+            # Add new worksheet
+            worksheet = spreadsheet.add_worksheet(sheet_name, 1000, 20)
             
             # Prepare headers
             headers = ['Post URL', 'Content', 'Success', 'Error', 'Timestamp']
@@ -54,7 +53,7 @@ class InstagramScraper:
                 ]
                 worksheet.append_row(row)
 
-            print(f"\nData saved to Google Sheet: {sheet_name}")
+            print(f"\nData saved to worksheet: {sheet_name}")
             print(f"Spreadsheet URL: {spreadsheet.url}")
             return spreadsheet.url
 
@@ -68,30 +67,47 @@ class InstagramScraper:
             time.sleep(3)  # Wait for initial load
             
             post_urls = set()  # Using set to avoid duplicates
-            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            consecutive_same_count = 0
+            scroll_attempts = 0
+            max_attempts = 50  # Maximum number of scroll attempts
             
-            while True:
-                # Get all post links on current view
-                posts = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/p/']")
-                for post in posts:
-                    post_urls.add(post.get_attribute('href'))
+            while scroll_attempts < max_attempts:
+                # Get current post count
+                old_count = len(post_urls)
+                
+                # Get both post and reel links
+                links = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/p/'], a[href*='/reel/']")
+                for link in links:
+                    post_urls.add(link.get_attribute('href'))
+                
+                # Check if we found new posts
+                new_count = len(post_urls)
+                if new_count > old_count:
+                    consecutive_same_count = 0
+                    print(f"Found {new_count} posts and reels so far...")
+                else:
+                    consecutive_same_count += 1
+                    print(f"No new posts found in scroll {consecutive_same_count}/3...")
+                
+                # If we haven't found new posts in 3 consecutive scrolls, stop
+                if consecutive_same_count >= 3:
+                    print("No new posts found after 3 scrolls, finishing...")
+                    break
                 
                 # Scroll down
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)  # Wait for content to load
+                self.driver.execute_script("""
+                    window.scrollTo(0, document.body.scrollHeight);
+                    """)
                 
-                # Calculate new scroll height
-                new_height = self.driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
-                    break  # If height didn't change, we've reached the bottom
-                last_height = new_height
-                
-                print(f"Found {len(post_urls)} posts so far...")
-                
+                # Random delay between 2-4 seconds to seem more human-like
+                time.sleep(4)
+                scroll_attempts += 1
+            
+            print(f"Final count: {len(post_urls)} posts and reels")
             return list(post_urls)
             
         except Exception as e:
-            print(f"Error getting profile posts: {e}")
+            print(f"Error getting profile content: {e}")
             return []
 
     def get_post_description(self, post_url):
@@ -99,23 +115,19 @@ class InstagramScraper:
             self.driver.get(post_url)
             time.sleep(2)  # Wait for page to load
             
-            # Find all elements with the specified classes
+            # Only get the main description with the specific classes
             elements = self.driver.find_elements(
                 By.CSS_SELECTOR, 
                 "._ap3a._aaco._aacu._aacx._aad7._aade"
             )
             
-            # Collect all text content
-            descriptions = []
-            for element in elements:
-                text = element.text.strip()
-                if text:  # Only add non-empty text
-                    descriptions.append(text)
+            # Get only the first element's text (main description)
+            description = elements[0].text.strip() if elements else None
             
             return {
                 'url': post_url,
-                'content': '\n\n'.join(descriptions) if descriptions else None,
-                'success': True
+                'content': description,
+                'success': True if description else False
             }
             
         except Exception as e:
