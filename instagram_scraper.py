@@ -29,7 +29,7 @@ class InstagramScraper:
     def save_to_sheets(self, results, sheet_name=None):
         try:
             # Open existing spreadsheet by its ID
-            SPREADSHEET_ID = '1yxVXUAneiISJmO5I1ow574cJYxBOo5VVYg-WHApTDOY'  # Replace with your spreadsheet ID
+            SPREADSHEET_ID = '1234567890'  # Replace with your spreadsheet ID
             spreadsheet = self.gs.open_by_key(SPREADSHEET_ID)
             
             # Create new worksheet with timestamp if no name provided
